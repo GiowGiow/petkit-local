@@ -23,6 +23,12 @@ _LOGGER = logging.getLogger(__name__)
 # How many polls in a row must fail before entities are marked unavailable.
 MAX_TRANSIENT_FAILURES = 3
 
+# How long to wait for the fountain to be heard before polling regardless.
+# Home Assistant brings its integrations up in parallel, and an ESPHome
+# Bluetooth proxy usually finishes connecting a minute or two after we are set
+# up, so the registry is still empty when we would otherwise poll.
+STARTUP_GRACE_PERIOD = 180
+
 STORAGE_VERSION = 1
 # Visit statistics are cheap to lose but noisy to write; batch them up.
 STORAGE_SAVE_DELAY = 30
@@ -42,9 +48,13 @@ class PetkitBleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass,
             _LOGGER,
             name=f"{DOMAIN} {fountain.address}",
-            update_interval=timedelta(seconds=scan_interval),
+            # Polling stays off until async_start has heard the fountain, so a
+            # restart never fires a doomed poll at a Bluetooth registry that
+            # has simply not filled in yet.
+            update_interval=None,
             config_entry=entry,
         )
+        self._scan_interval = timedelta(seconds=scan_interval)
         self.fountain = fountain
         self.rssi: int | None = None
         self.visits = VisitTracker()
@@ -58,6 +68,43 @@ class PetkitBleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         fountain.set_device_provider(self._lookup_device)
         fountain.register_push_callback(self._on_push)
         fountain.register_history_callback(self._on_history)
+
+    async def async_start(self) -> None:
+        """Wait for the fountain to turn up, then start polling it.
+
+        The proxy a fountain lives behind is itself a Home Assistant device, and
+        it reconnects well after this entry is set up. Polling immediately meant
+        every restart logged a failure about the fountain being out of range,
+        when all that had happened was that nothing had listened for it yet.
+        """
+        if self._lookup_device() is None:
+            await self._async_wait_for_device()
+        self.update_interval = self._scan_interval
+        await self.async_refresh()
+
+    async def _async_wait_for_device(self) -> None:
+        """Hold until some adapter or proxy hears the fountain advertise."""
+        address = self.fountain.address
+        _LOGGER.debug("%s: waiting for an adapter or proxy to hear it", address)
+        try:
+            await bluetooth.async_process_advertisements(
+                self.hass,
+                lambda _service_info: True,
+                bluetooth.BluetoothCallbackMatcher(address=address, connectable=True),
+                # Passive is enough: the fountain advertises on its own, and
+                # this is the same traffic the registry is already built from.
+                bluetooth.BluetoothScanningMode.PASSIVE,
+                STARTUP_GRACE_PERIOD,
+            )
+        except TimeoutError:
+            # Give up waiting and poll anyway, so a fountain that really is
+            # unreachable is reported as such instead of silently never
+            # starting.
+            _LOGGER.debug(
+                "%s: not heard within %ss, polling anyway",
+                address,
+                STARTUP_GRACE_PERIOD,
+            )
 
     async def async_load_visits(self) -> None:
         """Restore visit statistics before any entity reports a value."""

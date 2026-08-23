@@ -16,5 +16,5 @@
   "issue_tracker": "https://github.com/b12e/petkit-local/issues",
   "loggers": ["petkit_ble"],
   "requirements": ["bleak-retry-connector>=3.5.0"],
-  "version": "0.4.2"
+  "version": "0.4.3"
 }

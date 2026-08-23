@@ -65,8 +65,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: PetkitBleConfigEntry) ->
 
     # Reaching the fountain can take a while - it may be asleep, or the
     # Bluetooth proxy it lives behind may still be booting. Doing that inline
-    # held up Home Assistant startup for minutes, so the first poll runs in the
-    # background and entities stay unavailable until it lands.
+    # held up Home Assistant startup for minutes, so polling is started in the
+    # background and entities stay unavailable until the first poll lands.
     entry.async_create_background_task(
         hass,
         _async_first_refresh(hass, entry, coordinator, bool(secret_hex)),
@@ -82,7 +82,7 @@ async def _async_first_refresh(
     had_secret: bool,
 ) -> None:
     """Populate state, then persist anything the handshake taught us."""
-    await coordinator.async_refresh()
+    await coordinator.async_start()
 
     fountain = coordinator.fountain
     # The secret is only known after a successful handshake; persist it so a
