@@ -6,6 +6,8 @@
 > A fork of [b12e/petkit-local](https://github.com/b12e/petkit-local), tracking upstream
 > and carrying fixes verified against a live fountain.
 >
+> - **0.4.5**: do not reuse cached GATT services. A reconnection that restored them
+>   left the fountain unable to answer, which read as random unavailability.
 > - **0.4.4**: byte 1 of the status block is a run flag, not a suspend flag. The pump
 >   switch inverted it, so a running fountain reported itself paused.
 
