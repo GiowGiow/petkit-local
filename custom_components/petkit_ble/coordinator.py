@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from bleak.backends.device import BLEDevice
@@ -59,6 +59,9 @@ class PetkitBleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.rssi: int | None = None
         self.visits = VisitTracker()
         self._failures = 0
+        # Mirrors what the store already holds, so a poll that establishes no
+        # new session does not queue a write.
+        self._saved_connected: datetime | None = None
         self._store: Store[dict] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}.visits"
         )
@@ -111,6 +114,10 @@ class PetkitBleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         stored = await self._store.async_load()
         if stored:
             self.visits.from_dict(stored, dt_util.now().date())
+            last = stored.get("last_connected")
+            if last:
+                self.fountain.last_connected = dt_util.parse_datetime(last)
+                self._saved_connected = self.fountain.last_connected
             _LOGGER.debug(
                 "%s: restored visits today=%s total=%s",
                 self.fountain.address,
@@ -119,9 +126,24 @@ class PetkitBleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
     @callback
+    def _persisted_state(self) -> dict:
+        """Everything that has to survive a restart.
+
+        The store is named for the visits because that is what it started as,
+        but the last connection belongs here too: without it, every restart
+        reports a fountain that has never been reached, which is a different
+        claim from one that was reached an hour ago.
+        """
+        data = self.visits.to_dict()
+        last = self.fountain.last_connected
+        data["last_connected"] = last.isoformat() if last else None
+        return data
+
+    @callback
     def _save_visits(self) -> None:
         """Queue a write of the visit statistics."""
-        self._store.async_delay_save(self.visits.to_dict, STORAGE_SAVE_DELAY)
+        self._saved_connected = self.fountain.last_connected
+        self._store.async_delay_save(self._persisted_state, STORAGE_SAVE_DELAY)
 
     @callback
     def _lookup_device(self) -> BLEDevice | None:
@@ -254,6 +276,8 @@ class PetkitBleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self._failures = 0
         self._track_visit(state)
+        if self.fountain.last_connected != self._saved_connected:
+            self._save_visits()
         return state
 
     @callback
