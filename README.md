@@ -7,11 +7,12 @@
 > and carrying fixes verified against a live fountain.
 >
 > - **0.4.5**: do not reuse cached GATT services. Measured in isolation this took a
->   probe from 1/6 to 6/6 answered, but it did **not** on its own settle the
->   unavailability seen under Home Assistant. What the measurements do show is that
->   the fountain answers in 0.11s whenever a link is properly established, so the
->   fragile part is connection setup, not the device. Holding the link open
->   (`keep_alive`) avoids paying for that setup on every poll.
+>   probe from 1/6 to 6/6 answered, but it did **not** settle the unavailability seen
+>   under Home Assistant, where polls still fail about half the time. Neither did
+>   holding the link open. What the measurements do establish is where the fault is
+>   not: the fountain answers in 0.11s to 0.19s whenever a link is properly
+>   established, so the fragile part is connection setup on a shared adapter, not the
+>   device and not the command timeout.
 > - **0.4.4**: byte 1 of the status block is a run flag, not a suspend flag. The pump
 >   switch inverted it, so a running fountain reported itself paused.
 
