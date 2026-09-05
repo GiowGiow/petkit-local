@@ -6,6 +6,8 @@
 > A fork of [b12e/petkit-local](https://github.com/b12e/petkit-local), tracking upstream
 > and carrying fixes verified against a live fountain.
 >
+> - **0.4.6**: add a connection sensor and a smart mode switch, so status cards
+>   have the entities they expect.
 > - **0.4.5**: do not reuse cached GATT services. Measured in isolation this took a
 >   probe from 1/6 to 6/6 answered, but it did **not** settle the unavailability seen
 >   under Home Assistant, where polls still fail about half the time. Neither did
