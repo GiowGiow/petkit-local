@@ -6,6 +6,9 @@
 > A fork of [b12e/petkit-local](https://github.com/b12e/petkit-local), tracking upstream
 > and carrying fixes verified against a live fountain.
 >
+> - **0.4.7**: keep the individual visits the fountain logs, as an attribute and as
+>   `petkit_ble_visit` events, instead of only their running totals. Adds energy used
+>   today and average visit duration.
 > - **0.4.6**: add a connection sensor and a smart mode switch, so status cards
 >   have the entities they expect.
 > - **0.4.5**: do not reuse cached GATT services. Measured in isolation this took a
