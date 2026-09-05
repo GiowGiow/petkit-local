@@ -103,10 +103,10 @@ def test_decoder_does_not_grow_unboundedly_on_noise():
 STATUS_BLOCK = bytes(
     [
         1,
-        0,
+        1,
         2,
         1,
-        0,  # power, suspend, mode, mains, night dnd
+        0,  # power, run, mode, mains, night dnd
         0,
         0,
         0,
@@ -141,6 +141,38 @@ def test_parse_status():
     assert state["battery_percent"] == 88
     assert state["supply_voltage"] == pytest.approx(5.26)
     assert state["battery_voltage"] == pytest.approx(4.2)
+
+
+# Captured over BLE from a CTW3 (Eversweet Max, device id 223) while the pump
+# was running and the unit sat on mains. Kept verbatim: the synthetic block
+# above encodes what we believe the layout to be, this one encodes what a
+# fountain actually sent.
+CTW3_LIVE_STATUS = bytes.fromhex(
+    "0101010200000000000026fd530101000135ac001368106f640039053f05"
+)
+
+
+def test_parse_status_matches_real_ctw3_capture():
+    """Byte 1 is a run flag, reading 1 while the pump runs.
+
+    The two fields that describe the pump have to agree. Reading byte 1 as a
+    suspend flag and inverting it made a running fountain report itself
+    paused, which is the regression this capture pins down.
+    """
+    state = p.parse_status(CTW3_LIVE_STATUS)
+
+    assert state["run_status"] == 1
+    assert state["running_status"] == 1
+
+    assert state["power_status"] == 1
+    assert state["mode"] == MODE_NORMAL
+    assert state["electric_status"] == 2
+    assert state["filter_percent"] == 1
+    assert state["pump_runtime"] == 2_555_219
+    assert state["pump_runtime_today"] == 79_276
+    assert state["battery_percent"] == 100
+    assert state["supply_voltage"] == pytest.approx(4.968)
+    assert state["battery_voltage"] == pytest.approx(4.207)
 
 
 def test_parse_status_rejects_short_payload():

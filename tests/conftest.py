@@ -34,7 +34,7 @@ class FakeFountain:
         self.authenticated = False
 
         self.power_status = 1
-        self.suspend_status = 0
+        self.run_status = 1
         self.mode = 1
         self.filter_percent = 80
         self.pump_runtime = 100_000
@@ -95,7 +95,7 @@ class FakeFountain:
             if selector == p.SELECTOR_POWER_MODE:
                 self.mode = value
             else:
-                self.suspend_status = 0 if value else 1
+                self.run_status = value
             return self._resp(cmd, b"\x01")
 
         if cmd == p.CMD_SET_SETTINGS:
@@ -163,7 +163,7 @@ class FakeFountain:
         return bytes(
             [
                 self.power_status,
-                self.suspend_status,
+                self.run_status,
                 self.mode,
                 1,  # on mains
                 0,  # night dnd inactive

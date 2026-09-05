@@ -173,7 +173,7 @@ async def test_pause_uses_run_selector(fountain, patched_connection):
 
     sent = next(f for f in fountain.received if f.cmd == p.CMD_SET_MODE)
     assert sent.payload == bytes((1, 0, p.SELECTOR_RUN_PAUSE))
-    assert fountain.suspend_status == 1
+    assert fountain.run_status == 0
     assert fountain.power_status == 1
 
 
