@@ -184,7 +184,8 @@
         "name": "Connection",
         "state": {
           "connected": "Connected",
-          "disconnected": "Disconnected"
+          "disconnected": "Disconnected",
+          "connecting": "Connecting"
         }
       },
       "energy_consumed_today": {
@@ -192,6 +193,9 @@
       },
       "average_visit_duration": {
         "name": "Average visit"
+      },
+      "last_connected": {
+        "name": "Last connected"
       }
     },
     "switch": {

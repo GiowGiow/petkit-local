@@ -178,6 +178,7 @@ async def async_setup_entry(
     ]
     entities.append(PetkitBleRssiSensor(coordinator))
     entities.append(PetkitBleConnectionSensor(coordinator))
+    entities.append(PetkitBleLastConnectedSensor(coordinator))
     entities.append(PetkitBleVisitCountSensor(coordinator))
     entities.append(PetkitBleVisitDurationSensor(coordinator))
     entities.append(PetkitBleVisitTotalSensor(coordinator))
@@ -373,6 +374,31 @@ class PetkitBleAverageVisitSensor(PetkitBleEntity, SensorEntity):
         return True
 
 
+class PetkitBleLastConnectedSensor(PetkitBleEntity, SensorEntity):
+    """When the fountain last completed a session.
+
+    "Disconnected" alone does not say whether that happened a minute ago or an
+    hour ago, and on a device that advertises sparsely those are very
+    different situations.
+    """
+
+    _attr_translation_key = "last_connected"
+    _attr_icon = "mdi:bluetooth-connect"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "last_connected")
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self):
+        return self.coordinator.fountain.last_connected
+
+
 class PetkitBleConnectionSensor(PetkitBleEntity, SensorEntity):
     """Whether a Bluetooth link to the fountain is being held right now.
 
@@ -382,7 +408,7 @@ class PetkitBleConnectionSensor(PetkitBleEntity, SensorEntity):
 
     _attr_translation_key = "connection"
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["connected", "disconnected"]
+    _attr_options = ["connected", "connecting", "disconnected"]
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator) -> None:
@@ -394,7 +420,7 @@ class PetkitBleConnectionSensor(PetkitBleEntity, SensorEntity):
 
     @property
     def native_value(self) -> str:
-        return "connected" if self.coordinator.fountain.is_connected else "disconnected"
+        return self.coordinator.fountain.link_state
 
 
 class PetkitBleRssiSensor(PetkitBleEntity, SensorEntity):

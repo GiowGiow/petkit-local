@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
 from bleak.backends.device import BLEDevice
@@ -107,6 +108,12 @@ class PetkitFountain:
         self._seq = 0
         self._lock = asyncio.Lock()
         self._authenticated = False
+        # What the link is doing right now, for the UI to show. Separate
+        # from _authenticated because "trying" is worth seeing: this
+        # fountain advertises sparsely, so a reconnection can take minutes
+        # and looks identical to a dead integration without it.
+        self.link_state: str = "disconnected"
+        self.last_connected: datetime | None = None
         self._push_callbacks: list[Callable[[dict[str, Any]], None]] = []
         self._history_callbacks: list[Callable[[list[p.WorkRecord]], None]] = []
         self._stream_chunks: dict[int, bytes] = {}
@@ -293,6 +300,7 @@ class PetkitFountain:
             )
 
         self._decoder.reset()
+        self.link_state = "connecting"
         try:
             client = await establish_connection(
                 BleakClientWithServiceCache,
@@ -367,6 +375,7 @@ class PetkitFountain:
         """Fully release the connection so the next attempt starts clean."""
         client, self._client = self._client, None
         self._authenticated = False
+        self.link_state = "disconnected"
         self._decoder.reset()
         self._stream_chunks.clear()
         self._stream_total = 0
@@ -381,6 +390,7 @@ class PetkitFountain:
 
     def _on_disconnect(self, _client: BleakClientWithServiceCache) -> None:
         self._authenticated = False
+        self.link_state = "disconnected"
         for future in self._waiters.values():
             if not future.done():
                 future.set_exception(PetkitConnectionError("disconnected"))
@@ -423,6 +433,8 @@ class PetkitFountain:
             _LOGGER.debug("%s: version read failed: %s", self.address, err)
 
         self._authenticated = True
+        self.link_state = "connected"
+        self.last_connected = datetime.now(UTC)
 
     async def _sync_history(self) -> None:
         """Ask the fountain to upload the visits it recorded while we were away.
