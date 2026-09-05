@@ -105,3 +105,51 @@ async def test_polls_anyway_once_the_grace_period_expires(coordinator, monkeypat
     assert coordinator.data is None
     assert not coordinator.last_update_success
     assert "not in range" in str(coordinator.last_exception)
+
+
+async def test_last_connected_survives_a_restart(coordinator, monkeypatch):
+    """A restart must not turn "reached an hour ago" into "never reached".
+
+    The link state itself is per-process and starts empty, so the timestamp has
+    to come back from the store or the sensor lies about a fountain it has
+    talked to before.
+    """
+    from datetime import UTC, datetime
+
+    when = datetime(2026, 9, 5, 16, 5, 6, tzinfo=UTC)
+    coordinator.fountain.last_connected = when
+
+    saved = coordinator._persisted_state()
+    assert saved["last_connected"] == when.isoformat()
+
+    # A fresh coordinator is what a restart produces: nothing in memory.
+    coordinator.fountain.last_connected = None
+
+    async def _load():
+        return saved
+
+    monkeypatch.setattr(coordinator._store, "async_load", _load)
+    await coordinator.async_load_visits()
+
+    assert coordinator.fountain.last_connected == when
+
+
+async def test_an_unchanged_connection_queues_no_write(coordinator, monkeypatch):
+    """Polling every two minutes must not write to disk every two minutes."""
+    writes: list[int] = []
+    monkeypatch.setattr(coordinator, "_save_visits", lambda: writes.append(1))
+    _sighting(monkeypatch, True)
+
+    from datetime import UTC, datetime
+
+    coordinator.fountain.last_connected = datetime(2026, 9, 5, 16, 5, tzinfo=UTC)
+    coordinator._saved_connected = coordinator.fountain.last_connected
+
+    await coordinator._async_update_data()
+    assert writes == []
+
+    # A new session is worth a write.
+    coordinator.fountain.last_connected = datetime(2026, 9, 5, 17, 0, tzinfo=UTC)
+    await coordinator._async_update_data()
+    assert len(writes) == 1
+
