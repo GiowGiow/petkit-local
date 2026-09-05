@@ -301,6 +301,16 @@ class PetkitFountain:
                 self._on_disconnect,
                 timeout=CONNECT_TIMEOUT,
                 ble_device_callback=self._device_provider,
+                # A reconnection that restores the cached GATT services leaves
+                # this fountain unable to answer. The link comes up, the write
+                # goes out on the same handle, and nothing ever comes back on
+                # the notify characteristic, which surfaces as the first
+                # command of the session timing out. Measured on a CTW3 over
+                # six connections each: 1/6 answered with the cache on, 6/6
+                # with it off, every answer arriving in 0.11s to 0.19s. The
+                # cost of paying for service discovery on each connection is
+                # about a second, against a session that mostly does not work.
+                use_services_cache=False,
             )
             self._write_response = _prefers_write_response(client)
             await client.start_notify(NOTIFY_UUID, self._on_notify)

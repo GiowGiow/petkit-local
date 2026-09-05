@@ -269,6 +269,32 @@ async def test_fragmented_responses(monkeypatch, fountain):
     assert client.serial == "CTW3TEST000001"
 
 
+async def test_connect_does_not_reuse_cached_services(monkeypatch, fountain):
+    """Service discovery is repeated on every connection.
+
+    Restoring cached GATT services leaves this fountain unable to answer: the
+    link comes up and the first command of the session times out instead. The
+    flag is the whole fix, so a refactor must not drop it silently.
+    """
+    from custom_components.petkit_ble import device as device_module
+    from tests.conftest import FakeBleakClient
+
+    client_obj = FakeBleakClient(fountain)
+    seen: dict = {}
+
+    async def _establish(_cls, _dev, _name, _cb, **kwargs):
+        seen.update(kwargs)
+        client_obj.is_connected = True
+        return client_obj
+
+    monkeypatch.setattr(device_module, "establish_connection", _establish)
+
+    client = PetkitFountain("AA:BB:CC:DD:EE:FF", "CTW3")
+    await client.async_poll(BLE_DEVICE)
+
+    assert seen["use_services_cache"] is False
+
+
 # --- buffered history sync ----------------------------------------------
 
 
