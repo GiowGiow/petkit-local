@@ -360,7 +360,11 @@ def parse_status(payload: bytes) -> dict[str, Any]:
         raise ProtocolError(f"status payload too short: {len(payload)}")
     return {
         "power_status": payload[0],
-        "suspend_status": payload[1],
+        # A run flag, not a suspend flag: the firmware reports 1 while the
+        # pump is running and 0 while it is paused, mirroring the value that
+        # cmd 220 sends with SELECTOR_RUN_PAUSE. Captured from a CTW3 with the
+        # pump running: byte 1 is 0x01 while byte 14 (run_state) reads 1.
+        "run_status": payload[1],
         "mode": payload[2],
         "electric_status": payload[3],
         "night_dnd_active": payload[4],

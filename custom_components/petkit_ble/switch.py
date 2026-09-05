@@ -98,15 +98,15 @@ class PetkitBlePauseSwitch(PetkitBleEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool | None:
-        value = self._value("suspend_status")
-        return None if value is None else not bool(value)
+        value = self._value("run_status")
+        return None if value is None else bool(value)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        self.coordinator.async_assume(suspend_status=0)
+        self.coordinator.async_assume(run_status=1)
         await self.coordinator.async_run("paused", paused=False)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        self.coordinator.async_assume(suspend_status=1)
+        self.coordinator.async_assume(run_status=0)
         await self.coordinator.async_run("paused", paused=True)
 
 
