@@ -6,8 +6,12 @@
 > A fork of [b12e/petkit-local](https://github.com/b12e/petkit-local), tracking upstream
 > and carrying fixes verified against a live fountain.
 >
-> - **0.4.5**: do not reuse cached GATT services. A reconnection that restored them
->   left the fountain unable to answer, which read as random unavailability.
+> - **0.4.5**: do not reuse cached GATT services. Measured in isolation this took a
+>   probe from 1/6 to 6/6 answered, but it did **not** on its own settle the
+>   unavailability seen under Home Assistant. What the measurements do show is that
+>   the fountain answers in 0.11s whenever a link is properly established, so the
+>   fragile part is connection setup, not the device. Holding the link open
+>   (`keep_alive`) avoids paying for that setup on every poll.
 > - **0.4.4**: byte 1 of the status block is a run flag, not a suspend flag. The pump
 >   switch inverted it, so a running fountain reported itself paused.
 
