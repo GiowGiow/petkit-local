@@ -179,6 +179,13 @@
       },
       "pet_drink_duration_total": {
         "name": "Pet drinking time total"
+      },
+      "connection": {
+        "name": "Connection",
+        "state": {
+          "connected": "Connected",
+          "disconnected": "Disconnected"
+        }
       }
     },
     "switch": {
@@ -202,6 +209,9 @@
       },
       "battery_proximity": {
         "name": "Battery mode proximity"
+      },
+      "smart_mode": {
+        "name": "Smart mode"
       }
     }
   },

@@ -168,6 +168,7 @@ async def async_setup_entry(
         PetkitBleSensor(coordinator, description) for description in SENSORS
     ]
     entities.append(PetkitBleRssiSensor(coordinator))
+    entities.append(PetkitBleConnectionSensor(coordinator))
     entities.append(PetkitBleVisitCountSensor(coordinator))
     entities.append(PetkitBleVisitDurationSensor(coordinator))
     entities.append(PetkitBleVisitTotalSensor(coordinator))
@@ -320,6 +321,30 @@ class PetkitBleLastVisitSensor(PetkitBleEntity, SensorEntity):
     @property
     def available(self) -> bool:
         return True
+
+
+class PetkitBleConnectionSensor(PetkitBleEntity, SensorEntity):
+    """Whether a Bluetooth link to the fountain is being held right now.
+
+    Reports even when the data is stale, since a dropped link is exactly what
+    it exists to show.
+    """
+
+    _attr_translation_key = "connection"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["connected", "disconnected"]
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "connection")
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> str:
+        return "connected" if self.coordinator.fountain.is_connected else "disconnected"
 
 
 class PetkitBleRssiSensor(PetkitBleEntity, SensorEntity):

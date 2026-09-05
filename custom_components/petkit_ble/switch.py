@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import PetkitBleConfigEntry
+from .const import MODE_NORMAL, MODE_SMART
 from .entity import PetkitBleEntity
 
 # Settings-block switches: each maps to one byte of the cmd 221 payload.
@@ -58,7 +59,37 @@ async def async_setup_entry(
     ]
     entities.append(PetkitBlePowerSwitch(coordinator))
     entities.append(PetkitBlePauseSwitch(coordinator))
+    entities.append(PetkitBleSmartModeSwitch(coordinator))
     async_add_entities(entities)
+
+
+class PetkitBleSmartModeSwitch(PetkitBleEntity, SwitchEntity):
+    """Smart mode, as a switch.
+
+    The select is the honest control, because the fountain has named modes
+    rather than a flag. This mirrors it because dashboard cards routinely ask
+    for a switch, and a template helper doing the same job would live outside
+    the integration and outside whatever backs it up.
+    """
+
+    _attr_translation_key = "smart_mode"
+    _attr_icon = "mdi:auto-mode"
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "smart_mode")
+
+    @property
+    def is_on(self) -> bool | None:
+        value = self._value("mode")
+        return None if value is None else value == MODE_SMART
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self.coordinator.async_assume(mode=MODE_SMART)
+        await self.coordinator.async_run("mode", mode=MODE_SMART)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self.coordinator.async_assume(mode=MODE_NORMAL)
+        await self.coordinator.async_run("mode", mode=MODE_NORMAL)
 
 
 class PetkitBlePowerSwitch(PetkitBleEntity, SwitchEntity):
