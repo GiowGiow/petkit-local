@@ -129,6 +129,15 @@ SENSORS: tuple[PetkitSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     PetkitSensorDescription(
+        key="energy_consumed_today",
+        translation_key="energy_consumed_today",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=4,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PetkitSensorDescription(
         key="mode",
         translation_key="mode",
         device_class=SensorDeviceClass.ENUM,
@@ -174,6 +183,7 @@ async def async_setup_entry(
     entities.append(PetkitBleVisitTotalSensor(coordinator))
     entities.append(PetkitBleVisitTotalDurationSensor(coordinator))
     entities.append(PetkitBleLastVisitSensor(coordinator))
+    entities.append(PetkitBleAverageVisitSensor(coordinator))
     async_add_entities(entities)
 
 
@@ -317,6 +327,46 @@ class PetkitBleLastVisitSensor(PetkitBleEntity, SensorEntity):
     @property
     def native_value(self):
         return self.coordinator.visits.last_visit
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """The individual visits behind the counters, newest last.
+
+        The fountain logs each visit with its own duration, which is what the
+        PetKit app draws its drink history from. Carrying them here lets a card
+        render the same timeline without a separate entity per visit.
+        """
+        return {"visits": self.coordinator.visits.recent}
+
+    @property
+    def available(self) -> bool:
+        return True
+
+
+class PetkitBleAverageVisitSensor(PetkitBleEntity, SensorEntity):
+    """How long the pet drinks per visit today.
+
+    The app shows this next to the visit count, and it says something the
+    count alone does not: six quick sips is a different animal from one long
+    drink.
+    """
+
+    _attr_translation_key = "average_visit_duration"
+    _attr_icon = "mdi:timer-sand"
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "average_visit_duration")
+
+    @property
+    def native_value(self) -> float | None:
+        visits = self.coordinator.visits
+        if not visits.count:
+            return 0.0
+        return visits.duration.total_seconds() / visits.count
 
     @property
     def available(self) -> bool:

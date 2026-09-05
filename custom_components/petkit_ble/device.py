@@ -696,6 +696,9 @@ class PetkitFountain:
             self.state["water_purified_today"] = round(
                 p.water_purified_litres(self.alias, runtime_today), 2
             )
+            self.state["energy_consumed_today"] = round(
+                p.energy_kwh(self.alias, runtime_today), 4
+            )
 
         filter_percent = self.state.get("filter_percent")
         if filter_percent is not None:

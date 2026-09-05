@@ -28,6 +28,16 @@ VISIT_GAP_GRACE = timedelta(seconds=30)
 # Ignore single-sample blips, which are usually the sensor twitching.
 MIN_VISIT_DURATION = timedelta(seconds=2)
 
+# How many individual visits to keep for the timeline. The fountain logs each
+# one with its own duration, which is what the PetKit app draws its drink
+# history from; keeping them lets a dashboard do the same instead of only
+# showing a running count.
+MAX_RECENT_VISITS = 50
+
+# Records are deduplicated by device timestamp across days, so the set has to
+# outlive midnight. Cap it, keeping the newest.
+MAX_SEEN_RECORDS = 500
+
 
 @dataclass
 class VisitTracker:
@@ -46,6 +56,13 @@ class VisitTracker:
     # Set once the fountain hands us its own records; the flag-watching
     # fallback stops counting from that point so totals cannot be doubled.
     device_backed: bool = False
+
+    # The individual visits behind the counters, newest last.
+    recent: list[dict] = field(default_factory=list)
+
+    # Visits banked by the last ingest, for the caller to announce. Transient:
+    # never persisted, cleared on every call.
+    new_visits: list[dict] = field(default_factory=list, repr=False)
 
     _seen: set[int] = field(default_factory=set, repr=False)
     _started: datetime | None = field(default=None, repr=False)
@@ -80,6 +97,7 @@ class VisitTracker:
             # Keeps records from being counted twice if the fountain resends a
             # window across a restart.
             "seen": sorted(self._seen),
+            "recent": self.recent,
         }
 
     def from_dict(self, data: dict, today: date) -> None:
@@ -106,6 +124,7 @@ class VisitTracker:
         if last_visit:
             self.last_visit = datetime.fromisoformat(last_visit)
         self._seen = {int(v) for v in data.get("seen") or ()}
+        self.recent = list(data.get("recent") or ())[-MAX_RECENT_VISITS:]
 
     def ingest(self, records, now: datetime) -> bool:
         """Fold in visit records the fountain recorded itself.
@@ -133,23 +152,43 @@ class VisitTracker:
             self.duration = timedelta()
             changed = True
 
+        self.new_visits = []
+
         for record in records:
             local = record.timestamp.astimezone(now.tzinfo)
-            if local.date() != today:
-                continue
             if record.raw_time in self._seen:
                 continue
             self._seen.add(record.raw_time)
-            self.count += 1
-            self.total_count += 1
+
             stay = timedelta(seconds=record.stay_seconds)
-            self.duration += stay
+            visit = {"at": local.isoformat(), "seconds": record.stay_seconds}
+            self.recent.append(visit)
+            self.new_visits.append(visit)
+
+            # Lifetime counts every visit the fountain reports. Only the ones
+            # that happened today may touch the daily figures: the buffer can
+            # hold yesterday's visits, and those must not inflate today.
+            self.total_count += 1
             self.total_duration += stay
+            if local.date() == today:
+                self.count += 1
+                self.duration += stay
             if self.last_visit is None or local > self.last_visit:
                 self.last_visit = local
             changed = True
 
+        if changed:
+            self.recent.sort(key=lambda visit: visit["at"])
+            del self.recent[:-MAX_RECENT_VISITS]
+            self._trim_seen()
+
         return changed
+
+    def _trim_seen(self) -> None:
+        """Keep the dedup set bounded, dropping the oldest device timestamps."""
+        if len(self._seen) <= MAX_SEEN_RECORDS:
+            return
+        self._seen = set(sorted(self._seen)[-MAX_SEEN_RECORDS:])
 
     def update(self, detected: bool, now: datetime) -> bool:
         """Fold in one live observation of the detection flag.
@@ -224,5 +263,7 @@ class VisitTracker:
         self.day = today
         self.count = 0
         self.duration = timedelta()
-        self._seen.clear()
+        # `_seen` deliberately survives the roll: records are deduplicated by
+        # device timestamp across days, so clearing it here would let the
+        # fountain's next resend be banked a second time.
         return True

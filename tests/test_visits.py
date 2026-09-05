@@ -214,8 +214,13 @@ def test_flag_still_reports_visit_in_progress_when_device_backed():
     assert tracker.current_duration(at(210)) == timedelta(seconds=10)
 
 
-def test_records_from_another_day_are_ignored():
-    """The buffer can hold yesterday's visits; they must not inflate today."""
+def test_records_from_another_day_stay_out_of_today():
+    """The buffer can hold yesterday's visits; they must not inflate today.
+
+    They are still real visits, so they count towards the lifetime figures and
+    are kept in the log. Dropping them outright, as this used to, threw away
+    the only record of them anyone had.
+    """
     tracker = VisitTracker()
     yesterday = FakeRecord(-86400 + 60, 30, raw=900)
     today = FakeRecord(60, 20, raw=1001)
@@ -224,6 +229,56 @@ def test_records_from_another_day_are_ignored():
 
     assert tracker.count == 1
     assert tracker.duration == timedelta(seconds=20)
+
+    assert tracker.total_count == 2
+    assert tracker.total_duration == timedelta(seconds=50)
+    assert len(tracker.recent) == 2
+    assert [visit["seconds"] for visit in tracker.recent] == [30, 20]
+
+
+def test_every_banked_visit_is_announced_once():
+    """new_visits carries what the caller has not seen, and only that."""
+    tracker = VisitTracker()
+
+    tracker.ingest([FakeRecord(60, 25, raw=1001)], at(600))
+    assert [visit["seconds"] for visit in tracker.new_visits] == [25]
+
+    # A resend of the same window announces nothing.
+    tracker.ingest([FakeRecord(60, 25, raw=1001)], at(700))
+    assert tracker.new_visits == []
+
+    tracker.ingest([FakeRecord(300, 40, raw=1002)], at(800))
+    assert [visit["seconds"] for visit in tracker.new_visits] == [40]
+
+
+def test_dedup_survives_midnight():
+    """Regression: the dedup set used to be cleared with the daily counters.
+
+    The fountain resends a window it has already delivered, so a record that
+    crossed midnight would be banked a second time.
+    """
+    tracker = VisitTracker()
+    record = FakeRecord(60, 25, raw=1001)
+
+    tracker.ingest([record], at(600))
+    tracker.ingest([], at(86400 + 600))  # roll into the next day
+    tracker.ingest([record], at(86400 + 700))
+
+    assert tracker.total_count == 1
+    assert len(tracker.recent) == 1
+
+
+def test_visit_log_is_bounded():
+    """The log is for a timeline, not an archive."""
+    from custom_components.petkit_ble.visits import MAX_RECENT_VISITS
+
+    tracker = VisitTracker()
+    tracker.ingest(
+        [FakeRecord(60 + n, 10, raw=2000 + n) for n in range(MAX_RECENT_VISITS + 20)],
+        at(600),
+    )
+
+    assert len(tracker.recent) == MAX_RECENT_VISITS
 
 
 # --- lifetime totals ------------------------------------------------------
