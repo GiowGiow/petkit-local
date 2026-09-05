@@ -6,6 +6,7 @@
 > A fork of [b12e/petkit-local](https://github.com/b12e/petkit-local), tracking upstream
 > and carrying fixes verified against a live fountain.
 >
+> - **0.4.8**: describe visit events so they actually show up in the logbook.
 > - **0.4.7**: keep the individual visits the fountain logs, as an attribute and as
 >   `petkit_ble_visit` events, instead of only their running totals. Adds energy used
 >   today and average visit duration.
