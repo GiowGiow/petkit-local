@@ -175,7 +175,8 @@ class PetkitBleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         puts each visit in the logbook and lets automations react to a single
         drink, which a running total cannot express.
         """
-        for visit in self.visits.new_visits:
+        pending, self.visits.new_visits = self.visits.new_visits, []
+        for visit in pending:
             self.hass.bus.async_fire(
                 EVENT_VISIT,
                 {
@@ -193,6 +194,7 @@ class PetkitBleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if detected is None:
             return
         if self.visits.update(bool(detected), dt_util.now()):
+            self._announce_visits()
             self._save_visits()
 
     def _ble_device(self) -> BLEDevice | None:

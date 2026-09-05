@@ -243,12 +243,36 @@ def test_every_banked_visit_is_announced_once():
     tracker.ingest([FakeRecord(60, 25, raw=1001)], at(600))
     assert [visit["seconds"] for visit in tracker.new_visits] == [25]
 
+    # The queue is drained by the caller, not reset per ingest, so a visit the
+    # fallback banked is not thrown away by the next history sync.
+    tracker.new_visits = []
+
     # A resend of the same window announces nothing.
     tracker.ingest([FakeRecord(60, 25, raw=1001)], at(700))
     assert tracker.new_visits == []
 
     tracker.ingest([FakeRecord(300, 40, raw=1002)], at(800))
     assert [visit["seconds"] for visit in tracker.new_visits] == [40]
+
+
+def test_fallback_visits_are_logged_too():
+    """A visit the detection flag caught still belongs in the timeline.
+
+    Before this, the flag path incremented the counters and left no record of
+    when the visit happened, so a dashboard could say "1 visit today" and show
+    an empty history.
+    """
+    tracker = VisitTracker()
+
+    tracker.update(True, at(0))
+    tracker.update(True, at(10))
+    tracker.update(False, at(60))
+    tracker.update(False, at(200))  # past the grace period, visit closes
+
+    assert tracker.count == 1
+    assert len(tracker.recent) == 1
+    assert tracker.recent[0]["seconds"] > 0
+    assert [v["seconds"] for v in tracker.new_visits] == [tracker.recent[0]["seconds"]]
 
 
 def test_dedup_survives_midnight():
