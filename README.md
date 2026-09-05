@@ -1,7 +1,13 @@
 # PetKit BLE (local)
 
-[![Validate](https://github.com/b12e/petkit-local/actions/workflows/validate.yml/badge.svg)](https://github.com/b12e/petkit-local/actions/workflows/validate.yml)
+[![Validate](https://github.com/GiowGiow/petkit-local/actions/workflows/validate.yml/badge.svg)](https://github.com/GiowGiow/petkit-local/actions/workflows/validate.yml)
 [![hacs](https://img.shields.io/badge/HACS-custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
+
+> A fork of [b12e/petkit-local](https://github.com/b12e/petkit-local), tracking upstream
+> and carrying fixes verified against a live fountain.
+>
+> - **0.4.4**: byte 1 of the status block is a run flag, not a suspend flag. The pump
+>   switch inverted it, so a running fountain reported itself paused.
 
 A Home Assistant integration that talks to PetKit Eversweet fountains **directly over
 Bluetooth**. No PetKit account, no cloud round-trip, no second PetKit device acting as
