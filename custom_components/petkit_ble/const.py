@@ -6,6 +6,10 @@ from typing import Final
 
 DOMAIN: Final = "petkit_ble"
 
+# Fired once per visit the fountain reports, so the logbook and automations can
+# see individual drinks rather than only a running count.
+EVENT_VISIT: Final = "petkit_ble_visit"
+
 # --- GATT ---------------------------------------------------------------
 # Service 0xAAA0 carries the PetKit application protocol.
 # Confirmed against PetkitBleClientImpl: mWriteChar is CONTROL_UUID (aaa2),

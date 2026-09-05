@@ -186,6 +186,12 @@
           "connected": "Connected",
           "disconnected": "Disconnected"
         }
+      },
+      "energy_consumed_today": {
+        "name": "Energy used today"
+      },
+      "average_visit_duration": {
+        "name": "Average visit"
       }
     },
     "switch": {

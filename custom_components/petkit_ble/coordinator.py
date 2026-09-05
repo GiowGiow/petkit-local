@@ -14,7 +14,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, EVENT_VISIT
 from .device import PetkitAuthError, PetkitConnectionError, PetkitFountain
 from .visits import VisitTracker
 
@@ -162,9 +162,29 @@ class PetkitBleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Bank visit records the fountain recorded while we were away."""
         if not self.visits.ingest(records, dt_util.now()):
             return
+        self._announce_visits()
         self._save_visits()
         if self.data is not None:
             self.async_set_updated_data(dict(self.data))
+
+    @callback
+    def _announce_visits(self) -> None:
+        """Fire one event per newly banked visit.
+
+        The counters say how much the pet drank; these say when. Firing them
+        puts each visit in the logbook and lets automations react to a single
+        drink, which a running total cannot express.
+        """
+        for visit in self.visits.new_visits:
+            self.hass.bus.async_fire(
+                EVENT_VISIT,
+                {
+                    "address": self.fountain.address,
+                    "name": self.config_entry.title if self.config_entry else None,
+                    "at": visit["at"],
+                    "seconds": visit["seconds"],
+                },
+            )
 
     @callback
     def _track_visit(self, state: dict[str, Any]) -> None:
