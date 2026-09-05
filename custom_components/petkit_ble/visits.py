@@ -152,8 +152,6 @@ class VisitTracker:
             self.duration = timedelta()
             changed = True
 
-        self.new_visits = []
-
         for record in records:
             local = record.timestamp.astimezone(now.tzinfo)
             if record.raw_time in self._seen:
@@ -161,9 +159,7 @@ class VisitTracker:
             self._seen.add(record.raw_time)
 
             stay = timedelta(seconds=record.stay_seconds)
-            visit = {"at": local.isoformat(), "seconds": record.stay_seconds}
-            self.recent.append(visit)
-            self.new_visits.append(visit)
+            self._log(local, record.stay_seconds)
 
             # Lifetime counts every visit the fountain reports. Only the ones
             # that happened today may touch the daily figures: the buffer can
@@ -178,8 +174,6 @@ class VisitTracker:
             changed = True
 
         if changed:
-            self.recent.sort(key=lambda visit: visit["at"])
-            del self.recent[:-MAX_RECENT_VISITS]
             self._trim_seen()
 
         return changed
@@ -232,6 +226,7 @@ class VisitTracker:
         """End the visit under way, banking its duration."""
         if self._started is None:
             return False
+        started = self._started
         length = max(ended - self._started, timedelta())
         self._started = None
         self._last_seen = None
@@ -246,7 +241,20 @@ class VisitTracker:
         self.total_duration += length
         self.last_visit = ended
         self._counted = False
+
+        # The fallback logs too. A visit counted with no record of when it
+        # happened is the gap the device-record path was fixed for, and a
+        # visit the detection flag caught is no less real than a buffered one.
+        self._log(started, int(length.total_seconds()))
         return True
+
+    def _log(self, started: datetime, seconds: int) -> None:
+        """Add one visit to the timeline and to the announce queue."""
+        visit = {"at": started.isoformat(), "seconds": seconds}
+        self.recent.append(visit)
+        self.new_visits.append(visit)
+        self.recent.sort(key=lambda entry: entry["at"])
+        del self.recent[:-MAX_RECENT_VISITS]
 
     def _roll_day(self, now: datetime) -> bool:
         """Reset totals at local midnight."""
