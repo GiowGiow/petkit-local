@@ -6,6 +6,8 @@
 > A fork of [b12e/petkit-local](https://github.com/b12e/petkit-local), tracking upstream
 > and carrying fixes verified against a live fountain.
 >
+> - **0.4.11**: the last connection survives a restart, instead of every restart
+>   claiming the fountain was never reached.
 > - **0.4.10**: log visits the detection flag catches, not just the ones the device
 >   buffers. The counters moved and the timeline stayed empty.
 > - **0.4.9**: report `connecting` as well as connected/disconnected, and add a
